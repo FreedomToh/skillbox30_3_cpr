@@ -3,11 +3,6 @@
 #include <cpr/cpr.h>
 
 
-struct parameters {
-    std::string arg = "";
-    std::string value = "";
-};
-
 int countChars(const std::string &s, char c) {
     int count = 0;
     for (char v:s) {
@@ -17,7 +12,7 @@ int countChars(const std::string &s, char c) {
     return count;
 }
 
-void stringToPair(std::string &s, parameters &p) {
+void stringToPair(std::string &s, std::vector<cpr::Pair> &p) {
     std::string first;
     std::string second;
 
@@ -26,8 +21,8 @@ void stringToPair(std::string &s, parameters &p) {
     second = s.substr(delimeterPos + 1, s.length() - (delimeterPos-1));
 
     //std::cout << first << ":" << second << std::endl;
-    p.arg = first;
-    p.value = second;
+    p.emplace_back((std::string)first, (std::string)second);
+
 }
 
 class Requests {
@@ -41,19 +36,18 @@ public:
         this->url = val;
     }
 
-    bool get(std::vector<parameters> &p) {
+    bool get(std::vector<cpr::Pair> &p) {
         if (this->url.length() == 0) return false;
 
         std::string params = "?";
-        for (int i = 0; i < p.size(); i ++) {
-            auto arg = p[i].arg;
-            auto val = p[i].value;
+        for (auto pair = p.begin(); pair != p.end(); ++pair) {
+            auto arg = pair->key;
+            auto val = pair->value;
 
             params += arg;
             params += "=";
             params += val;
-
-            if (i < p.size() - 1) params += "&";
+            params += "&";
         }
 
         std::string tmp_url = this->url+"/get"+params;
@@ -69,21 +63,11 @@ public:
         return true;
     }
 
-    bool post(std::vector<parameters> &p) {
+    bool post(std::vector<cpr::Pair> &p) {
         if (this->url.length() == 0) return false;
-        cpr::Payload pl = {};
-        for (auto & i : p) {
-            std::string arg = i.arg;
-            std::string val = i.value;
-
-            cpr::Pair pair(arg.c_str(), val.c_str());
-
-            cpr::CurlHolder holder;
-            pl.AddPair(pair, holder);
-        }
 
         std::string tmp_url = this->url+"/post";
-        r = cpr::Post(cpr::Url(tmp_url), cpr::Payload(pl));
+        r = cpr::Post(cpr::Url(tmp_url), cpr::Payload(p.begin(), p.end()));
 
         if (r.status_code != 200) {
             this->getErrors();
@@ -104,14 +88,14 @@ public:
         }
     }
 
-
 };
 
 int main() {
     std::cout << "CPR 30.3 requests with arguments" << std::endl;
 
-    std::vector<parameters> requestsVec;
+    std::vector<cpr::Pair> requestsVec;
     Requests *r = new Requests("http://httpbin.org/");
+
     while (true) {
         std::string request;
         std::getline(std::cin, request);
@@ -129,11 +113,9 @@ int main() {
             continue;
         }
 
-        parameters p;
-        stringToPair(request, p);
-        requestsVec.push_back(p);
-
+        stringToPair(request, requestsVec);
         std::cin.clear();
     }
+
     return 0;
 }
